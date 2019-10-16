@@ -1,0 +1,66 @@
+import requests
+import time
+from openpyxl import load_workbook
+from lxml import etree
+import sys
+
+
+# 虚拟IP地址爬写，需手动在桌面创建ip.xlsx文件，地址可手动修改
+class IpSpider:
+    # 初始化函数（地址，param，存储地址）
+    def __init__(self):
+        self.url = "https://www.kuaidaili.com/free/inha/"  # 免费虚拟IP网站
+        self.param = 1
+        self.path_home = r"C:\Users\Administrator\Desktop\ip2.xlsx"  # 文件写入地址，可修改
+
+    # 开始爬取
+    @staticmethod
+    def begin(url, param):
+        head = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/27.0.1453.94 Safari/537.36'}
+        html = requests.get(url + param, headers=head)
+        html.encoding = "utf-8"
+        etree_html = etree.HTML(html.text)
+        ipaddress = etree_html.xpath('//*[@id="list"]/table/tbody/tr/td[1]/text()')  # IP地址
+        ipport = etree_html.xpath('//*[@id="list"]/table/tbody/tr/td[2]/text()')  # IP地址对应的端口号
+        time.sleep(5)
+        return ipaddress, ipport  # 返回IP地址和IP地址端口号集合，一一对应
+
+    # 修改page 爬取下一页
+    @staticmethod
+    def changepage(param, i):
+        param = str(i)  # 根据i修改页码
+        return param  # 返回页码
+
+    # 把数据存入表格
+    @staticmethod
+    def saveipdata(path_home, ipaddress, ipportaddress, y):
+        try:
+            wb = load_workbook(path_home)
+            sheet_ranges = wb['Sheet1']
+            ws = wb['Sheet1']
+            for i in range(1, len(ipaddress) + 1):  # 将IP地址循环存入sheet1的A列
+                position1 = "A" + str(i + 15 * (y - 1))
+                ws[position1] = ipaddress[i - 1]
+                time.sleep(0.01)
+            for i in range(1, len(ipportaddress) + 1):  # 将端口号循环存入sheet1的B列
+                position2 = "B" + str(i + 15 * (y - 1))
+                ws[position2] = ipportaddress[i - 1]
+                time.sleep(0.01)
+            wb.save(path_home)
+        except:
+            print("请创建文件，地址为 " + path_home)
+            sys.exit()
+
+
+# main函数
+if __name__ == '__main__':
+    ipSpider = IpSpider()
+    z = 2
+    for x in range(1, z):  # 循环用于改变爬取页面page，修改y值,页数为（y-1）
+        n = x
+        address1 = ipSpider.begin(ipSpider.url, ipSpider.changepage(ipSpider.param, x))  # 得到IP与端口集合
+        address2 = address1[0]  # IP集合
+        address3 = address1[1]  # 端口集合
+        ipSpider.saveipdata(ipSpider.path_home, address2, address3, n)  # 存入excel文档
+    print("------虚拟IP爬取完成------")
