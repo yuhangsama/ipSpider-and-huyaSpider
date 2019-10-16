@@ -1,0 +1,99 @@
+import requests
+import time
+import json
+import pandas as pd
+import socket
+import datetime
+
+socket.setdefaulttimeout(3)
+
+
+class Spider:
+    # 初始化
+    def __init__(self):
+        self.url = "https://www.huya.com/l?"
+        self.data1 = data1 = {              # 构建的字典，用于完成ajax请求
+            'm': 'LiveList',
+            'do': 'getLiveListByPage',
+            'tagAll': '0',
+            'page': '2'
+        }
+
+    # 得到虚拟IP集合
+    @staticmethod
+    def getip():
+        df = pd.read_excel("C:/Users/Administrator/Desktop/ip.xlsx")    # 虚拟ip文件地址，可修改
+        ip = df.values
+        return ip                                                       # 返回IP地址和端口号集合
+
+    # 验证ip是否可用
+    @staticmethod
+    def verifyip(url, ip):
+        m = []
+        for i in range(len(ip)):
+            ipx = ip[i][0]
+            ipy = ip[i][1]
+            try:
+                requests.get(url, proxies={'http': str(ipx) + ":" + str(ipy)}, timeout=3)   # 判断IP是否可用
+            except:                                 # 不可用输出
+                print("------此ip失效" + ipx + ipy)
+            else:                                   # 可用循环存入新建列表m
+                # print("---------成功"+ipx)
+                n = str(ipx) + ":" + str(ipy)
+                m.append(n)
+        return m                                    # 返回可用列表
+
+    # 修改爬取时的IP，每一页爬取换一个IP
+    @staticmethod
+    def useip(m, i):
+        return m[i]
+
+    # 改变页码
+    @staticmethod
+    def change(data1, i):
+        data1["page"] = i
+        return data1
+
+    # 开始爬取
+    @staticmethod
+    def begin(url, data1, prox1):
+        head = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/27.0.1453.94 Safari/537.36'}
+        proxies = {
+            'http': prox1}
+        s = requests.session()
+        html = s.get(url, params=data1, headers=head, proxies=proxies)
+        html.encoding = "utf-8"
+        json_dict = json.loads(html.text)
+        infos = json_dict['data']['datas']
+        i = 1
+        for info in infos:                                      # 构造需要的数据字典
+            item = {'标题': info['introduction'], '类型': info['gameFullName'], '主播': info['nick'],
+                    '网址': 'https://www.huya.com/' + info['profileRoom'], '人气': info['totalCount']}
+
+            df = pd.DataFrame(item, columns=['标题', '类型', '主播', '网址', '人气'], index=[i])
+            i = i + 1
+            df.to_csv('C:/Users/Administrator/Desktop/example2.csv', mode='a', header=False, encoding="GB18030")  # 数据存储
+            time.sleep(0.01)
+        time.sleep(3)
+
+
+if __name__ == '__main__':
+    starttime = datetime.datetime.now()
+    y = 2                                                                  # 修改需要爬取得页数为(y-1)
+    spider = Spider()
+    print("---正在验证虚拟IP是否可用----请稍后-----")
+    z = spider.verifyip(spider.url, spider.getip())
+    print("---验证完成， 可用数量为" + str(len(z))+" 开始爬取---请稍后-----")
+    for x in range(1, y):
+        prox = spider.useip(z, x)    # 得到第x个虚拟IP+端口
+        print("---第" + str(x) + "页，爬取中，请稍等---" + "  使用的ip为" + prox)
+        data0 = spider.change(spider.data1, x)                                 # 得到需爬取的第x页page
+        spider.begin(spider.url, data0, prox)                                  # 开始爬取（爬取地址，page，虚拟IP+端口）
+        print("---第" + str(x) + "页爬取存入完成" + "，已完成  " + str('percent: {:.2%}'.format(x/(y-1))))
+        print("\n")
+        time.sleep(0.1)
+    print("--全部爬取存入完成,共" + str(y - 1) + "页" + " 爬取个数为" + str((y-1)*120))
+    endtime = datetime.datetime.now()
+    print("---共耗时---"+str((endtime - starttime).seconds) + "秒")
+
